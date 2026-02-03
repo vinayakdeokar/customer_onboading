@@ -10,7 +10,7 @@ pipeline {
 
     string(
       name: 'CUSTOMER',
-      description: 'Customer ID (example: xxcc01)'
+      description: 'Customer ID (example: abc01)'
     )
   }
 
@@ -25,29 +25,46 @@ pipeline {
     stage('Validate Customer') {
       steps {
         sh '''
-          echo "Checking if customer already exists for product..."
+          echo "Checking if customer already exists..."
 
           if jq -e ".customers.${CUSTOMER}.products.${PRODUCT}" customer_onboarding.json > /dev/null; then
             echo "ERROR: Customer already exists for this product!"
             exit 1
-          else
-            echo "Customer not found. Safe to onboard."
           fi
+
+          echo "Customer not found. Proceeding to add."
         '''
       }
     }
 
-    stage('Add Customer (Manual Step)') {
+    stage('Add Customer') {
       steps {
-        echo """
-✔ Validation passed
+        sh '''
+          echo "Adding customer to JSON..."
 
-👉 Please add customer '${CUSTOMER}' under product '${PRODUCT}'
-👉 Update customer_onboarding.json
-👉 Commit & push the change
+          jq --arg customer "$CUSTOMER" --arg product "$PRODUCT" '
+          .customers[$customer].products[$product].groups = {
+            ("adg-" + $product + "-databricks-contributor-qa"): {
+              "permissions": ["USE_CATALOG", "USE_SCHEMA", "SELECT"]
+            }
+          }
+          ' customer_onboarding.json > tmp.json
 
-This pipeline will stop here.
-"""
+          mv tmp.json customer_onboarding.json
+        '''
+      }
+    }
+
+    stage('Commit & Push') {
+      steps {
+        sh '''
+          git config user.email "jenkins@local"
+          git config user.name "jenkins-bot"
+
+          git add customer_onboarding.json
+          git commit -m "Onboard customer ${CUSTOMER} for ${PRODUCT}"
+          git push origin main
+        '''
       }
     }
   }
