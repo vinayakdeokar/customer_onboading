@@ -18,18 +18,20 @@ pipeline {
 
     stage('Checkout Repo') {
       steps {
-        git branch: 'main',
-            url: 'https://github.com/<your-org>/customer-onboarding.git'
+        git url: 'https://github.com/vinayakdeokar/customer_onboading.git', branch: 'main'
       }
     }
 
     stage('Validate Customer') {
       steps {
         sh '''
-          echo "Checking if customer already exists..."
-          if jq -e ".${PRODUCT}.customers.${CUSTOMER}" customer_onboarding.json > /dev/null; then
+          echo "Checking if customer already exists for product..."
+
+          if jq -e ".customers.${CUSTOMER}.products.${PRODUCT}" customer_onboarding.json > /dev/null; then
             echo "ERROR: Customer already exists for this product!"
             exit 1
+          else
+            echo "Customer not found. Safe to onboard."
           fi
         '''
       }
@@ -38,14 +40,14 @@ pipeline {
     stage('Add Customer (Manual Step)') {
       steps {
         echo """
-        ✔ Validation passed
+✔ Validation passed
 
-        👉 Please add customer '${CUSTOMER}' under product '${PRODUCT}'
-        👉 Update customer_onboarding.json
-        👉 Commit & push the change
+👉 Please add customer '${CUSTOMER}' under product '${PRODUCT}'
+👉 Update customer_onboarding.json
+👉 Commit & push the change
 
-        This pipeline will stop here.
-        """
+This pipeline will stop here.
+"""
       }
     }
   }
